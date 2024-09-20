@@ -39,8 +39,9 @@ season_color = [BLUE, GREEN, YELLOW, ORANGE_RED]
 
 #timestamp = 0
 #14:30   14:32
-timestamp = (14<<12) + (60<<6)
+timestamp = (23<<12) + (63<<6)
 
+blinkon = False
 #leds = array.array("I", [0 for _ in range(NUM_LEDS)])
 """
 tim = Timer()
@@ -111,29 +112,31 @@ sm.active(1)
 ##########################################################################
 
 
-def clock_show():
+def clock_show(blinkon = False):
     leds = array.array("I",[dim_col for _ in range(NUM_LEDS)])
     bs  = timestamp & 0x3F          # bits  0 to  5
     bm  = (timestamp >> 6) & 0x3F   # bits  6 to 11
     bm4 = bm >> 2                   # 4bits  [32, 16, 8, 4]
     bm1 = bm & 0b11                 # 0,1,2 or 3 binutes
-    hr  = (timestamp >> 12) & 0x1F  # bits 12 to 16
+    hr  = ((timestamp >> 12) & 0x1F)%24  # bits 12 to 16
     hr8 = hr%8
     hr3 = hr//8
     if (bm >> 5): 
         for n in range(7):
             leds[(hr8 +(n+1))%8] = bm_col[hr3] if (( (0x10 - bm4)>>n) & (bs&1)) else dim_col
+        #leds[(hr8 +3-bm1)%8] = bm_col[hr3] if blinkon else dim_col
     else:
         for n in range(7):
             leds[(hr8 -(n+1))%8] = bm_col[hr3] if ((bm4>>n) & (bs&1)) else dim_col 
+        #leds[(hr8 -bm1)%8] = bm_col[hr3] if blinkon else dim_col
 
-    ledss = array.array("I",[((bs>>n)&1)*bm_col[hr3] for n in range(NUM_LEDS)])
     leds[hr8] = hr_col[hr3]
     sm.put(leds, 8)
 
 
 while True:
-    clock_show()
+    clock_show(blinkon)
+    #blinkon = not blinkon
     time.sleep_ms(100)
 
 
