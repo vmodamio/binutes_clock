@@ -39,7 +39,7 @@ season_color = [BLUE, GREEN, YELLOW, ORANGE_RED]
 
 #timestamp = 0
 #14:30   14:32
-timestamp = (14<<12) + (32<<6)
+timestamp = (14<<12) + (60<<6)
 
 #leds = array.array("I", [0 for _ in range(NUM_LEDS)])
 """
@@ -120,7 +120,7 @@ def clock_show():
     hr  = (timestamp >> 12) & 0x1F  # bits 12 to 16
     hr8 = hr%8
     hr3 = hr//8
-    if (bm4 >> 8): 
+    if (bm >> 5): 
         for n in range(7):
             leds[(hr8 +(n+1))%8] = bm_col[hr3] if (( (0x10 - bm4)>>n) & (bs&1)) else dim_col
     else:
