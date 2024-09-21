@@ -39,9 +39,54 @@ season_color = [BLUE, GREEN, YELLOW, ORANGE_RED]
 
 #timestamp = 0
 #14:30   14:32
-timestamp = (23<<12) + (63<<6)
+timestamp = (10<<12) + (30<<6)
+"""
+Timestamp bits:
+    0-5:   64 bsecs
+    6-11:  64 binutes
+    12-16: 24 Hr           ts
+    17-21: 31 days
+    22-25: 12 months
+    26-31: 64 years from 2024
 
-blinkon = False
+    leap year is multiple of 4 (year & 0b11)==0  
+
+    ts & (4095 )
+"""
+num_days = array.array("I", [ 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31])
+binut = 2**12-1
+hour = (2**5-1)<<12
+day  = (2**5-1)<<17
+month = (2**4-1)<<22
+year = (2**6-1)<<26
+
+
+def ndays(ts):
+    m = ((ts & month)>>22)%12
+    leap = 0
+    if (m == 1):
+        leap = 0 if ((ts>>26) & 3) else 1
+    return num_days[m] + leap
+
+
+def cycle_timestamp(ts):
+    global timestamp
+    if ( (timestamp & (binut | hour)) == ((23<<12) + binut) ):
+        timestamp+=1
+        timestamp &= ~hour
+        #timestamp |= (0 & hour) setting the hour to zero doesnt need to OR
+        if (((timestamp & day) >> 17) == (ndays(timestamp) -1 ) ):
+            timestamp &= ~day
+            if (((timestamp & month) >> 22) == 11 ):
+                timestamp &= ~ month
+                timestamp+= 1<<26
+            else:
+                timestamp+= 1<<22
+        else:
+            timestamp+= 1<<17
+    else:
+        timestamp+=1
+
 #leds = array.array("I", [0 for _ in range(NUM_LEDS)])
 """
 tim = Timer()
@@ -77,9 +122,9 @@ sm_ticks = rp2.StateMachine(1, bsecond_tick, freq=2048, set_base=Pin(25))
 def bsec(p):
     global timestamp
     timestamp+=1
-    print(timestamp)
+    #print(timestamp)
 
-sm_ticks.irq(bsec)
+sm_ticks.irq(cycle_timestamp)
 # Start the StateMachine.
 sm_ticks.active(1)
 
@@ -112,7 +157,7 @@ sm.active(1)
 ##########################################################################
 
 
-def clock_show(blinkon = False):
+def clock_show():
     leds = array.array("I",[dim_col for _ in range(NUM_LEDS)])
     bs  = timestamp & 0x3F          # bits  0 to  5
     bm  = (timestamp >> 6) & 0x3F   # bits  6 to 11
@@ -124,19 +169,16 @@ def clock_show(blinkon = False):
     if (bm >> 5): 
         for n in range(7):
             leds[(hr8 +(n+1))%8] = bm_col[hr3] if (( (0x10 - bm4)>>n) & (bs&1)) else dim_col
-        #leds[(hr8 +3-bm1)%8] = bm_col[hr3] if blinkon else dim_col
     else:
         for n in range(7):
             leds[(hr8 -(n+1))%8] = bm_col[hr3] if ((bm4>>n) & (bs&1)) else dim_col 
-        #leds[(hr8 -bm1)%8] = bm_col[hr3] if blinkon else dim_col
 
     leds[hr8] = hr_col[hr3]
     sm.put(leds, 8)
 
 
 while True:
-    clock_show(blinkon)
-    #blinkon = not blinkon
+    clock_show()
     time.sleep_ms(100)
 
 
