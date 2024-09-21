@@ -10,7 +10,6 @@ machine.freq(102400000)
 # Configure the number of WS2812 LEDs.
 NUM_LEDS = 8
 PIN_NUM = 2
-brightness = 0.05
 brightness_hour      = 0.7
 brightness_binute   = 0.1
 
@@ -26,6 +25,13 @@ for i,c in enumerate(day_color):
     b = int((c[2] & 0xFF) * brightness_hour)
     hr_col[i] = (g<<16) + (r<<8) + b
 
+hr_col2 = array.array("I", [0 for _ in range(3)])
+for i,c in enumerate(day_color):
+    r = int((c[0] & 0xFF) * brightness_hour*0.5)
+    g = int((c[1] & 0xFF) * brightness_hour*0.5)
+    b = int((c[2] & 0xFF) * brightness_hour*0.5)
+    hr_col2[i] = (g<<16) + (r<<8) + b
+
 bm_col = array.array("I", [0 for _ in range(3)])
 for i,c in enumerate(day_color):
     r = int((c[0] & 0xFF) * brightness_binute)
@@ -39,7 +45,7 @@ season_color = [BLUE, GREEN, YELLOW, ORANGE_RED]
 
 #timestamp = 0
 #14:30   14:32
-timestamp = (10<<12) + (30<<6)
+timestamp = (10<<12) + (32<<6) + 56
 """
 Timestamp bits:
     0-5:   64 bsecs
@@ -173,7 +179,8 @@ def clock_show():
         for n in range(7):
             leds[(hr8 -(n+1))%8] = bm_col[hr3] if ((bm4>>n) & (bs&1)) else dim_col 
 
-    leds[hr8] = hr_col[hr3]
+    #leds[hr8] = hr_col[hr3] 
+    leds[hr8] = hr_col2[hr3] if ((((bs+1) & 0xF)>>1) < bm1) else hr_col[hr3] 
     sm.put(leds, 8)
 
 
