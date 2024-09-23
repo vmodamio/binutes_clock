@@ -45,7 +45,8 @@ season_color = [BLUE, GREEN, YELLOW, ORANGE_RED]
 
 #timestamp = 0
 #14:30   14:32
-timestamp = (10<<12) + (32<<6) + 56
+timestamp = (8<<12) + (0<<6) + 38
+nclicks = 0
 """
 Timestamp bits:
     0-5:   64 bsecs
@@ -134,6 +135,47 @@ sm_ticks.irq(cycle_timestamp)
 # Start the StateMachine.
 sm_ticks.active(1)
 
+## button state machine
+@rp2.asm_pio()
+def button_debounce():
+    wrap_target()
+    label(0)
+    wait(0, pin, 0)
+    set(x, 31)        
+    label(1)
+    jmp(pin, 0)
+    jmp(x_dec, 1)
+    irq( rel(0))
+
+    label(2)
+    wait(1, pin, 0)
+    set(x, 31)        
+    label(3)
+    jmp(pin, 2)
+    jmp(x_dec, 3)
+    wrap()
+
+tim = Timer()
+
+def click(p):
+    global nclicks
+    nclicks+=1
+    if nclicks == 1:
+        tim.init(mode=Timer.ONE_SHOT, period=4000, callback=button_timeout)
+    else:
+        tim.deinit()
+    print(nclicks)
+
+def button_timeout(p):
+    global nclicks
+    nclicks = 0
+
+# Instantiate StateMachine(0) with wait_pin_low program on Pin(16).
+pin15 = Pin(15, Pin.IN, Pin.PULL_UP)
+sm_debounce = rp2.StateMachine(2, button_debounce, freq=2000,  in_base=pin15)
+sm_debounce.irq(click)
+sm_debounce.active(1)
+
 
 """
 The LEDS state machine
@@ -183,9 +225,41 @@ def clock_show():
     leds[hr8] = hr_col2[hr3] if ((((bs+1) & 0xF)>>1) < bm1) else hr_col[hr3] 
     sm.put(leds, 8)
 
+def date_show():
+    print('Date mode')
+
+def set_hours():
+    print('Setting hours')
+
+def set_binutes():
+    print('Setting binutes')
+
+def set_year():
+    print('Setting year')
+
+def set_month():
+    print('Setting month')
+
+def set_day():
+    print('Setting day')
 
 while True:
-    clock_show()
-    time.sleep_ms(100)
+    if nclicks:
+        if nclicks == 1:
+            date_show()
+        elif nclicks == 2:
+            set_hours()
+        elif nclicks == 3:
+            set_binutes()
+        elif nclicks == 4:
+            set_year()
+        elif nclicks == 5:
+            set_month()
+        elif nclicks == 6:
+            set_day()
+        time.sleep(1)
+    else:
+        clock_show()
+        time.sleep_ms(100)
 
 
