@@ -40,12 +40,20 @@ for i,c in enumerate(day_color):
     bm_col[i] = (g<<16) + (r<<8) + b
 
 dim_col = (0X1<<16) + (0X1<<8) +  0X1
+day_col = (0XB2<<16) + (0XB2<<8) + 0XB2
+week_col = (0X0<<16) + (0X7D<<8) + 0XB2
 
 season_color = [BLUE, GREEN, YELLOW, ORANGE_RED]
+season_col = array.array("I", [0 for _ in range(4)])
+for i,c in enumerate(season_color):
+    r = int((c[0] & 0xFF) * brightness_hour)
+    g = int((c[1] & 0xFF) * brightness_hour)
+    b = int((c[2] & 0xFF) * brightness_hour)
+    season_col[i] = (g<<16) + (r<<8) + b
 
 #timestamp = 0
 #14:30   14:32
-timestamp = (8<<12) + (0<<6) + 38
+timestamp = (5<<12) + (32<<6) + (2<<17) + (0<<22) 
 nclicks = 0
 """
 Timestamp bits:
@@ -160,15 +168,16 @@ tim = Timer()
 def click(p):
     global nclicks
     nclicks+=1
+    print(nclicks)
     if nclicks == 1:
-        tim.init(mode=Timer.ONE_SHOT, period=4000, callback=button_timeout)
+        tim.init(mode=Timer.ONE_SHOT, period=8000, callback=button_timeout)
     else:
         tim.deinit()
-    print(nclicks)
 
 def button_timeout(p):
     global nclicks
     nclicks = 0
+    print('timeout')
 
 # Instantiate StateMachine(0) with wait_pin_low program on Pin(16).
 pin15 = Pin(15, Pin.IN, Pin.PULL_UP)
@@ -206,6 +215,7 @@ sm.active(1)
 
 
 def clock_show():
+    global timestamp
     leds = array.array("I",[dim_col for _ in range(NUM_LEDS)])
     bs  = timestamp & 0x3F          # bits  0 to  5
     bm  = (timestamp >> 6) & 0x3F   # bits  6 to 11
@@ -221,27 +231,92 @@ def clock_show():
         for n in range(7):
             leds[(hr8 -(n+1))%8] = bm_col[hr3] if ((bm4>>n) & (bs&1)) else dim_col 
 
-    #leds[hr8] = hr_col[hr3] 
     leds[hr8] = hr_col2[hr3] if ((((bs+1) & 0xF)>>1) < bm1) else hr_col[hr3] 
     sm.put(leds, 8)
 
 def date_show():
-    print('Date mode')
+    global timestamp
+    leds = array.array("I",[dim_col for _ in range(NUM_LEDS)])
+    dayn = (timestamp & day) >> 17    
+    monthn = (timestamp & month) >> 22
+    yearn = (timestamp & year) >> 26 
+    month3 = (monthn%3)+1
+    season = monthn//3
+    for n in range(2):
+        leds[6+n] = season_col[season] if ((month3 >> n)&1) else dim_col 
+
+    for n in range(5):
+        leds[n] =  day_col if (((dayn+1) >> n) & 1) else dim_col
+
+    # day of week, year 0 is 2024
+    jan1wd = 0 # 1st Jan 2024 was monday
+    yeardays = 0
+    for n in range(yearn):
+        jan1wd += 1 if (n & 3) else 2
+    for n in range(monthn):
+        leap = 0
+        if (n == 1):
+            leap = 0 if (year & 3) else 1
+        yeardays += num_days[n] + leap
+    yeardays += dayn
+    weekday = (jan1wd + yeardays)%7
+    if (timestamp & 1):
+        leds[weekday] = week_col
+    sm.put(leds, 8)
 
 def set_hours():
-    print('Setting hours')
+    global nclicks
+    global timestamp
+    leds = array.array("I",[dim_col for _ in range(NUM_LEDS)])
+    for n in range(24):
+        leds[n%8] = hr_col[(n//8)] 
+        leds[(n-1)%8] = dim_col
+        sm.put(leds, 8)
+        time.sleep(1)
+        if (nclicks == 3):
+            timestamp = (n<<12)
+            break
+    nclicks = 3
 
 def set_binutes():
-    print('Setting binutes')
+    global nclicks
+    global timestamp
+    leds = array.array("I",[dim_col for _ in range(NUM_LEDS)])
+    hr = (timestamp & hour) >> 12
+    hr8 = hr%8
+    hr3 = hr//8
+    for n in range(16):
+        leds[hr8] = hr_col[hr3]
+        if (n >> 3): 
+            for m in range(7):
+                leds[(hr8 +(m+1))%8] = bm_col[hr3] if (( (0x10 - n)>>m) & 1) else dim_col
+        else:
+            for m in range(7):
+                leds[(hr8 -(m+1))%8] = bm_col[hr3] if ((n >> m) & 1)  else dim_col 
+        sm.put(leds, 8)
+        time.sleep(0.87)
+        leds = array.array("I",[dim_col for _ in range(NUM_LEDS)])
+        leds[hr8] = hr_col[hr3]
+        sm.put(leds, 8)
+        time.sleep(0.87)
+        if (nclicks == 4):
+            timestamp = (hr << 12) + (n << 8)
+            break
+    nclicks = 0
+
+
 
 def set_year():
-    print('Setting year')
+    #print('Setting year')
+    pass
 
 def set_month():
-    print('Setting month')
+    #print('Setting month')
+    pass
 
 def set_day():
-    print('Setting day')
+    #print('Setting day')
+    pass
 
 while True:
     if nclicks:
@@ -257,7 +332,7 @@ while True:
             set_month()
         elif nclicks == 6:
             set_day()
-        time.sleep(1)
+        time.sleep(0.5)
     else:
         clock_show()
         time.sleep_ms(100)
