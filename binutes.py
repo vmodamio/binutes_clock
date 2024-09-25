@@ -168,7 +168,7 @@ tim = Timer()
 def click(p):
     global nclicks
     nclicks+=1
-    print(nclicks)
+    #print(nclicks)
     if nclicks == 1:
         tim.init(mode=Timer.ONE_SHOT, period=8000, callback=button_timeout)
     else:
@@ -177,7 +177,7 @@ def click(p):
 def button_timeout(p):
     global nclicks
     nclicks = 0
-    print('timeout')
+    #print('timeout')
 
 # Instantiate StateMachine(0) with wait_pin_low program on Pin(16).
 pin15 = Pin(15, Pin.IN, Pin.PULL_UP)
@@ -302,21 +302,58 @@ def set_binutes():
         if (nclicks == 4):
             timestamp = (hr << 12) + (n << 8)
             break
-    nclicks = 0
-
-
+    nclicks = 4
 
 def set_year():
-    #print('Setting year')
-    pass
+    global nclicks
+    global timestamp
+    leds = array.array("I",[dim_col for _ in range(NUM_LEDS)])
+    for n in range(8):
+        leds[n] = week_col 
+        leds[(n-1)%8] = dim_col
+        sm.put(leds, 8)
+        time.sleep(2)
+        if (nclicks == 5):
+            timestamp &= ~year
+            timestamp |= (n<<26)
+            break
+    nclicks = 5
 
 def set_month():
-    #print('Setting month')
-    pass
+    global nclicks
+    global timestamp
+    leds = array.array("I",[dim_col for _ in range(NUM_LEDS)])
+    monthn = (timestamp & month) >> 22
+    yearn = (timestamp & year) >> 26 
+    month3 = (monthn%3)+1
+    season = monthn//3
+    for n in range(12):
+        m3 = (n%3)+1
+        season = n//3
+        for s in range(2):
+            leds[6+s] = season_col[season] if ((m3 >> s)&1) else dim_col
+        sm.put(leds, 8)
+        time.sleep(1)
+        if (nclicks == 6):
+            timestamp &= ~month
+            timestamp |= (n << 22)
+            break
+    nclicks = 6
 
 def set_day():
-    #print('Setting day')
-    pass
+    global nclicks
+    global timestamp
+    leds = array.array("I",[dim_col for _ in range(NUM_LEDS)])
+    for d in range(ndays(timestamp)):
+        for n in range(5):
+            leds[n] =  day_col if (((d+1) >> n) & 1) else dim_col
+        sm.put(leds,8)
+        time.sleep(1)
+        if (nclicks == 7):
+            timestamp &= ~day
+            timestamp |= (d << 17)
+            break
+    nclicks = 0 
 
 while True:
     if nclicks:
